@@ -2,6 +2,7 @@
 #include <iostream>
 #include <exception>
 #include <vector>
+#include <string>
 
 // Nicer looking messages
 const std::string prefix = "[+] ";
@@ -67,17 +68,56 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
     int segFileCount = modf((double)fileSize / (double)LineSizeBytes, &intpart) == 0.0 ? fileSize / LineSizeBytes : fileSize / LineSizeBytes + 1;
     std::cout << prefix << "Amount of segment files created: " << segFileCount << std::endl;
 
+    // TODO: Add file actions overlapping
     // Read and write LineSizeBytes * NumberOfLinesPerSegment into each segment file
-    for (int i = 0; i < segFileCount; ++i) { }
-    if (!ReadFile(hFile, (LPVOID)buff, LineSizeBytes * NumberOfLinesPerSegment, &nRead, NULL)) {
-        std::cout << prefix << "ReadFile failed: " << GetLastError() << std::endl;
+    DWORD nWrite = 0;
+    for (int i = 0; i < segFileCount; ++i) {
+        if (!ReadFile(hFile, (LPVOID)buff, LineSizeBytes * NumberOfLinesPerSegment, &nRead, NULL)) {
+            std::cout << prefix << "ReadFile failed: " << GetLastError() << std::endl;
+            return;
+        }
+        std::cout << prefix << "Read " << nRead << " bytes" << std::endl;
+
+        // Create seg file (i.txt)
+        std::string segFilePath = "./segments/" + std::to_string(i);
+        HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (!hSegFile) {
+            std::cout << prefix << "Segment file creation failed: " << GetLastError() << std::endl;
+            return;
+        }
+
+        if (!WriteFile(hSegFile, buff, LineSizeBytes * NumberOfLinesPerSegment, &nWrite, NULL)) {
+            std::cout << prefix << "WriteFile failed: " << GetLastError() << std::endl;
+            return;
+        }
+        std::cout << prefix << "Written " << nWrite << " bytes to " << segFilePath;
+        CloseHandle(hSegFile);
     }
-    std::cout << prefix << "Read " << nRead << " bytes" << std::endl;
     
+    // Delete every seg file
+    for (int i = 0; i < segFileCount; ++i) {
+        std::string segFilePath = "./segments/" + std::to_string(i);
+        if (!DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str())) {
+            std::cout << prefix << "Failed to delete file " << segFilePath << ": " << GetLastError() << std::endl;
+        }
+    }
+    
+    // Delete segment directory after being emptied
+    if (!RemoveDirectory(L"./segments")) {
+        if (GetLastError() == 145) {
+            std::cout << prefix << "Directory not empty" << std::endl;
+        }
+        else {
+            std::cout << prefix << "Failed to remove segments directory: " << GetLastError() << std::endl;
+        }   
+    }
+
 }
 
 int main(int argc, char **argv)
 {
+    // TODO: Add try and catch
     // TODO: Delete when done
     /*
     if (argc != 3) {
