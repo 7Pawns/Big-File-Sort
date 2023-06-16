@@ -3,6 +3,7 @@
 #include <exception>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 // Nicer looking messages
 const std::string prefix = "[+] ";
@@ -60,24 +61,44 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
     // Opening Big File for read and write into segment files
     DWORD nRead = 0;
-    std::vector<char> v(LineSizeBytes*NumberOfLinesPerSegment);
-    char *buff = &v[0];
 
-    // Check if there will be N full segments or N full segments and 1 that isn't full;
-    double intpart;
-    int segFileCount = modf((double)fileSize / (double)LineSizeBytes, &intpart) == 0.0 ? fileSize / LineSizeBytes : fileSize / LineSizeBytes + 1;
+    std::vector<char> buff(LineSizeBytes);
+
+    // Calculate the amount of segment files needed;
+    int segFileCount = floor(((double)fileSize / (double)LineSizeBytes) / (double)NumberOfLinesPerSegment) == ceil(((double)fileSize / (double)LineSizeBytes) / (double)NumberOfLinesPerSegment) ? 
+        (fileSize / LineSizeBytes) / NumberOfLinesPerSegment : (fileSize / LineSizeBytes) / NumberOfLinesPerSegment + 1;
+   
     std::cout << prefix << "Amount of segment files created: " << segFileCount << std::endl;
 
     // TODO: Add file actions overlapping
     // Read and write LineSizeBytes * NumberOfLinesPerSegment into each segment file
     DWORD nWrite = 0;
     for (int i = 0; i < segFileCount; ++i) {
-        if (!ReadFile(hFile, (LPVOID)buff, LineSizeBytes * NumberOfLinesPerSegment, &nRead, NULL)) {
-            std::cout << prefix << "ReadFile failed: " << GetLastError() << std::endl;
-            return;
-        }
-        std::cout << prefix << "Read " << nRead << " bytes" << std::endl;
+        // Instead of reading the entire seg file data at once, we read just LineSizeBytes so we can save it as a word in a vector for easier sorting
+        std::vector<std::string> words;
+        for (int j = 0; j < NumberOfLinesPerSegment; ++j) {
+            if (!ReadFile(hFile, static_cast<void*>(buff.data()), LineSizeBytes, &nRead, NULL)) {
+                std::cout << prefix << "ReadFile failed: " << GetLastError() << std::endl;
+                return;
+            }
 
+            words.push_back(std::string(buff.begin(), buff.end()));
+        }
+
+        std::cout << prefix << "Buffer number " << i << ": " << std::endl;
+        std::cout << prefix << "Read " << nRead << " bytes" << std::endl;
+        
+        std::cout << prefix << "Words before sort: " << std::endl;
+        for (std::string word : words) {
+            std::cout << word;
+        }
+        //Sort the buffer words
+        std::sort(words.begin(), words.end());
+        
+        std::cout << prefix << "Words after sort: " << std::endl;
+        for (std::string word : words) {
+            std::cout << word;
+        }
         // Create seg file (i.txt)
         std::string segFilePath = "./segments/" + std::to_string(i);
         HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -87,11 +108,14 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
             return;
         }
 
-        if (!WriteFile(hSegFile, buff, LineSizeBytes * NumberOfLinesPerSegment, &nWrite, NULL)) {
+        // Write the words in sorted order
+        if (!WriteFile(hSegFile, &buff, LineSizeBytes * NumberOfLinesPerSegment, &nWrite, NULL)) {
             std::cout << prefix << "WriteFile failed: " << GetLastError() << std::endl;
             return;
         }
-        std::cout << prefix << "Written " << nWrite << " bytes to " << segFilePath;
+        std::cout << prefix << "Written " << nWrite << " bytes to " << segFilePath << ".txt" << std::endl;
+
+
         CloseHandle(hSegFile);
     }
     
