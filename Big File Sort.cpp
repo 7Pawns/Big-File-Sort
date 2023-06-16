@@ -84,6 +84,7 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
             words.push_back(std::string(buff.begin(), buff.end()));
         }
+        std::cout << sizeof(words) << std::endl;
 
         std::cout << prefix << "Buffer number " << i << ": " << std::endl;
         std::cout << prefix << "Read " << nRead << " bytes" << std::endl;
@@ -100,7 +101,7 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
             std::cout << word;
         }
         // Create seg file (i.txt)
-        std::string segFilePath = "./segments/" + std::to_string(i);
+        std::string segFilePath = "./segments/" + std::to_string(i) + ".txt";
         HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (!hSegFile) {
@@ -109,11 +110,16 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
         }
 
         // Write the words in sorted order
-        if (!WriteFile(hSegFile, &buff, LineSizeBytes * NumberOfLinesPerSegment, &nWrite, NULL)) {
-            std::cout << prefix << "WriteFile failed: " << GetLastError() << std::endl;
-            return;
+        for (std::string word : words) {
+            if (!WriteFile(hSegFile, word.c_str(), LineSizeBytes * NumberOfLinesPerSegment, &nWrite, NULL)) {
+                std::cout << prefix << "WriteFile failed: " << GetLastError() << std::endl;
+                return;
+            }
         }
-        std::cout << prefix << "Written " << nWrite << " bytes to " << segFilePath << ".txt" << std::endl;
+        
+
+        
+        std::cout << prefix << "Written " << nWrite << " bytes to " << segFilePath << std::endl;
 
 
         CloseHandle(hSegFile);
@@ -121,12 +127,12 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
     
     // Delete every seg file
     for (int i = 0; i < segFileCount; ++i) {
-        std::string segFilePath = "./segments/" + std::to_string(i);
+        std::string segFilePath = "./segments/" + std::to_string(i) + ".txt";
         if (!DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str())) {
             std::cout << prefix << "Failed to delete file " << segFilePath << ": " << GetLastError() << std::endl;
         }
     }
-    
+
     // Delete segment directory after being emptied
     if (!RemoveDirectory(L"./segments")) {
         if (GetLastError() == 145) {
@@ -134,7 +140,7 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
         }
         else {
             std::cout << prefix << "Failed to remove segments directory: " << GetLastError() << std::endl;
-        }   
+        }
     }
 
 }
