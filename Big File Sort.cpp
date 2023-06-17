@@ -11,8 +11,9 @@
 const std::string prefixInfo = "[+] ";
 const std::string prefixError = "[-] ";
 
+int startFileNum = 0;
 
-std::vector<HANDLE> divide(HANDLE, DWORD, int, int);
+std::vector<HANDLE> divide(HANDLE, DWORD, int, int, int&);
 void merge(std::vector<HANDLE>, HANDLE, int);
 
 class FileSort {
@@ -29,7 +30,100 @@ public:
         LineSizeBytes = lineSizeBytes;
     }
     void Sort(const std::string &inFilePath, const std::string &outFilePath);
+    void Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath);
 };
+
+void FileSort::Sort(const std::vector<std::string>& inFilePaths, const std::string &outFilePath) {
+    // Delete out file path if exists
+    std::wstring temp = std::wstring(outFilePath.begin(), outFilePath.end());
+    LPCWSTR lpcwOutFilePath = temp.c_str();
+
+    DeleteFile(lpcwOutFilePath);
+
+    std::vector<HANDLE> hAllTempFiles;
+
+    for (std::string inFilePath : inFilePaths) {
+        // Validate each file
+        temp = std::wstring(inFilePath.begin(), inFilePath.end());
+        LPCWSTR lpcwInFilePath = temp.c_str();
+        DWORD dwFileAttrib = GetFileAttributes(lpcwInFilePath);
+
+        if (!(dwFileAttrib != INVALID_FILE_ATTRIBUTES && !(dwFileAttrib & FILE_ATTRIBUTE_DIRECTORY))) {
+            throw std::string("File Doesn't Exist");
+        }
+
+        // Check if file size exceed maxFileSizeBytes
+        HANDLE hBigFile = CreateFile(lpcwInFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hBigFile == INVALID_HANDLE_VALUE) {
+            throw std::string("Unable to open file");
+        }
+
+        DWORD fileSize = GetFileSize(hBigFile, NULL);
+        if (fileSize > MaxFileSizeBytes) {
+            throw std::string("File size surpassed the maximum size supplied");
+        }
+        std::cout << prefixInfo << "File size is: " << fileSize << std::endl;
+
+        // Call division of temp files function
+        std::cout << "Start File num: " << startFileNum << std::endl;
+        std::vector<HANDLE> hTempFiles = divide(hBigFile, fileSize, LineSizeBytes, NumberOfLinesPerSegment, startFileNum);
+
+        // TODO: Check if necessary
+        if (hTempFiles.empty()) {
+            std::cout << "Process Failed" << std::endl;
+            return;
+        }
+
+        // Delete big file
+        CloseHandle(hBigFile);
+
+        hAllTempFiles.insert(hAllTempFiles.end(), hTempFiles.begin(), hTempFiles.end());
+    }
+    
+    //DeleteFile(lpcwInFilePath);
+    std::cout << prefixInfo << "Finished divide " << std::endl;
+
+    // Create output big file
+    temp = std::wstring(outFilePath.begin(), outFilePath.end());
+    LPCWSTR wsOutFilePath = temp.c_str();
+    HANDLE hOutBigFile = CreateFile(wsOutFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hOutBigFile == INVALID_HANDLE_VALUE) {
+
+        hOutBigFile = CreateFile(wsOutFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hOutBigFile == INVALID_HANDLE_VALUE) {
+            throw std::string("Can't open output file handle");
+        }
+
+    }
+
+    // Call merging of temp files into big file
+    merge(hAllTempFiles, hOutBigFile, LineSizeBytes);
+
+    std::cout << prefixInfo << "Finished sorting into big file" << std::endl;
+    
+    // Build the sorted file from all the temp files of all files
+
+    std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
+
+    // Delete every seg file
+    for (int i = 0; i < startFileNum; ++i) {
+        std::string segFilePath = "./segments/" + std::to_string(i) + ".txt";
+        if (!DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str())) {
+            throw std::string("Failed to remove file");
+        }
+    } 
+
+    std::cout << prefixInfo << "Deleting segments directory..." << std::endl;
+
+    // Delete segment directory after being emptied
+    if (!RemoveDirectory(L"./segments")) {
+        throw std::string("Failed to remove directory");
+    }
+
+    std::cout << prefixInfo << "Completed Successfully. " << "New sorted file created: " << outFilePath << std::endl;
+    std::cout << startFileNum << std::endl;
+}
 
 void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePath) {
     std::wstring temp = std::wstring(outFilePath.begin(), outFilePath.end());
@@ -60,7 +154,7 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
     std::cout << prefixInfo << "File size is: " << fileSize << std::endl;
     
     // Call division of temp files function
-    std::vector<HANDLE> hTempFiles = divide(hBigFile, fileSize, LineSizeBytes, NumberOfLinesPerSegment);
+    std::vector<HANDLE> hTempFiles = divide(hBigFile, fileSize, LineSizeBytes, NumberOfLinesPerSegment, startFileNum);
 
     // TODO: Check if necessary
     if (hTempFiles.empty()) {
@@ -92,18 +186,16 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
     std::cout << prefixInfo << "Finished sorting into big file" << std::endl;
 
-    int countFile = 0;
-    bool noMoreFiles = false;
-    std::string segFilePath;
     
     std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
 
     // Delete every seg file
-    do {
-        segFilePath = "./segments/" + std::to_string(countFile) + ".txt";
-        ++countFile;
-
-    } while (DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str()));
+    for (int i = 0; i < startFileNum; ++i) {
+        std::string segFilePath = "./segments/" + std::to_string(i) + ".txt";
+        if (!DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str())) {
+            throw std::string("Failed to remove file");
+        }
+    }
 
     std::cout << prefixInfo << "Deleting segments directory..." << std::endl;
 
@@ -117,12 +209,12 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 }
 
 // Divide Big files into temp files
-std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, int NumberOfLinesPerSegment) {
+std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, int NumberOfLinesPerSegment, int &startFileNum) {
 
     // Create Diretory for segment files
     if (!CreateDirectory(L"./segments", NULL)) {
-        // Error for already created directory
-        throw std::string("Failed to open segments directory");
+        // Check if directory already has files and startFileNum = 0
+        
     }
 
     // Opening Big File for read and write into segment files
@@ -168,7 +260,8 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
             std::cout << word;
         }
         // Create seg file (i.txt)
-        std::string segFilePath = "./segments/" + std::to_string(i) + ".txt";
+        std::string segFilePath = "./segments/" + std::to_string(i + startFileNum) + ".txt";
+        std::cout << "Writing to: " << segFilePath << std::endl;
         HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (!hSegFile) {
@@ -188,6 +281,8 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
         hTempFiles.push_back(hSegFile);
 
     }
+    startFileNum += segFileCount;
+
 
     return hTempFiles;
 }
@@ -260,6 +355,7 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
 
 
 
+
 int main(int argc, char **argv)
 {
     
@@ -269,12 +365,15 @@ int main(int argc, char **argv)
     // Handle WINAPI Errors thrown
     try {
         fs.Sort("tests/test1.txt", "./sorted.txt");
+        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" };
+        startFileNum = 0;
+        fs.Sort(inFilePaths, "./sorted2.txt");
     }
     catch (const std::string &e) {
         std::cout << prefixError << e << " WINAPI Error: " << GetLastError() << std::endl;
     }
     
-    
+
     return 0;
 }
 
