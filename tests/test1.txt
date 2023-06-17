@@ -2,3 +2,7 @@ tree
 fess
 vlad
 asds
+trap
+aloc
+trys
+bols

@@ -8,7 +8,9 @@
 #include <map>
 
 // Nicer looking messages
-const std::string prefix = "[+] ";
+const std::string prefixInfo = "[+] ";
+const std::string prefixError = "[-] ";
+
 
 std::vector<HANDLE> divide(HANDLE, DWORD, int, int);
 void merge(std::vector<HANDLE>, HANDLE, int);
@@ -36,26 +38,25 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
     DWORD dwFileAttrib = GetFileAttributes(wsInFilePath);
 
     if (!(dwFileAttrib != INVALID_FILE_ATTRIBUTES && !(dwFileAttrib & FILE_ATTRIBUTE_DIRECTORY))) {
-        std::cout << prefix << "File Doesn't Exist" << std::endl;
-        return;
+        throw std::string("File Doesn't Exist");
     }
 
     // Check if file size exceed maxFileSizeBytes
     HANDLE hBigFile = CreateFile(wsInFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hBigFile == INVALID_HANDLE_VALUE) {
-        std::cout << "Unable to open file" << std::endl;
-        std::cout << GetLastError() << std::endl;
-        return;
+        throw std::string("Unable to open file");
     }
+
     DWORD fileSize = GetFileSize(hBigFile, NULL);
     if (fileSize > MaxFileSizeBytes) {
-        std::cout << prefix << "File size surpassed the maximum size supplied" << std::endl;
+        throw std::string("File size surpassed the maximum size supplied");
     }
-    std::cout << prefix << "File size is: " << fileSize << std::endl;
+    std::cout << prefixInfo << "File size is: " << fileSize << std::endl;
     
     // Call division of temp files function
     std::vector<HANDLE> hTempFiles = divide(hBigFile, fileSize, LineSizeBytes, NumberOfLinesPerSegment);
 
+    // TODO: Check if necessary
     if (hTempFiles.empty()) {
         std::cout << "Process Failed" << std::endl;
         return;
@@ -64,7 +65,8 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
     // Delete big file
     CloseHandle(hBigFile);
     //DeleteFile(wsInFilePath);
-    std::cout << "finished divide " << std::endl;
+    std::cout << prefixInfo << "Finished divide " << std::endl;
+    
     // Create output big file
     temp = std::wstring(outFilePath.begin(), outFilePath.end());
     LPCWSTR wsOutFilePath = temp.c_str();
@@ -86,16 +88,8 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
     // Delete segment directory after being emptied
     if (!RemoveDirectory(L"./segments")) {
-        if (GetLastError() == 145) {
-            std::cout << prefix << "Directory not empty" << std::endl;
-        }
-        else {
-            std::cout << prefix << "Failed to remove segments directory: " << GetLastError() << std::endl;
-        }
+        throw std::string("Failed to remove directory");
     }
-    
-    
-
 
 }
 
@@ -105,12 +99,7 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
     // Create Diretory for segment files
     if (!CreateDirectory(L"./segments", NULL)) {
         // Error for already created directory
-        if (GetLastError() == 183) {
-            std::cout << prefix << "segments folder already created" << std::endl;
-        }
-        else {
-            std::cout << GetLastError() << std::endl;
-        }
+        throw std::string("Failed to open segments directory");
     }
 
     // Opening Big File for read and write into segment files
@@ -123,36 +112,35 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
     int segFileCount = floor(((double)fileSize / (double)LineSizeBytes) / (double)NumberOfLinesPerSegment) == ceil(((double)fileSize / (double)LineSizeBytes) / (double)NumberOfLinesPerSegment) ?
         (fileSize / LineSizeBytes) / NumberOfLinesPerSegment : (fileSize / LineSizeBytes) / NumberOfLinesPerSegment + 1;
 
-    std::cout << prefix << "Amount of segment files created: " << segFileCount << std::endl;
+    std::cout << prefixInfo << "Amount of segment files created: " << segFileCount << std::endl;
 
-    // TODO: Add file actions overlapping
     // Read and write LineSizeBytes * NumberOfLinesPerSegment into each segment file
     std::vector<HANDLE> hTempFiles;
     DWORD nWrite = 0;
     for (int i = 0; i < segFileCount; ++i) {
+        
         // Instead of reading the entire seg file data at once, we read just LineSizeBytes so we can save it as a word in a vector for easier sorting
         std::vector<std::string> words;
         for (int j = 0; j < NumberOfLinesPerSegment; ++j) {
             if (!ReadFile(hBigFile, static_cast<void*>(buff.data()), LineSizeBytes, &nRead, NULL)) {
-                std::cout << prefix << "ReadFile failed: " << GetLastError() << std::endl;
-                return std::vector<HANDLE>();
+                throw std::string("Failed to read big file");
             }
 
             words.push_back(std::string(buff.begin(), buff.end()));
         }
         std::cout << sizeof(words) << std::endl;
 
-        std::cout << prefix << "Buffer number " << i << ": " << std::endl;
-        std::cout << prefix << "Read " << nRead << " bytes" << std::endl;
+        std::cout << prefixInfo << "Buffer number " << i << ": " << std::endl;
+        std::cout << prefixInfo << "Read " << nRead << " bytes" << std::endl;
 
-        std::cout << prefix << "Words before sort: " << std::endl;
+        std::cout << prefixInfo << "Words before sort: " << std::endl;
         for (std::string word : words) {
             std::cout << word;
         }
         //Sort the buffer words
         std::sort(words.begin(), words.end());
 
-        std::cout << prefix << "Words after sort: " << std::endl;
+        std::cout << prefixInfo << "Words after sort: " << std::endl;
         for (std::string word : words) {
             std::cout << word;
         }
@@ -161,19 +149,18 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
         HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (!hSegFile) {
-            std::cout << prefix << "Segment file creation failed: " << GetLastError() << std::endl;
-            return std::vector<HANDLE>();
+            throw std::string("Segment file creation failed");
         }
 
         // Write the words in sorted order
         for (std::string word : words) {
             if (!WriteFile(hSegFile, word.c_str(), LineSizeBytes, &nWrite, NULL)) {
-                std::cout << prefix << "WriteFile failed: " << GetLastError() << std::endl;
-                return std::vector<HANDLE>();
+                std::cout << prefixInfo << "WriteFile failed: " << GetLastError() << std::endl;
+                throw std::string("Failed writing to segment file");
             }
         }
 
-        std::cout << prefix << "Written " << nWrite << " bytes to " << segFilePath << std::endl;
+        std::cout << prefixInfo << "Written " << nWrite << " bytes to " << segFilePath << std::endl;
 
         hTempFiles.push_back(hSegFile);
 
@@ -195,20 +182,17 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
     for (HANDLE hTemp : hTempFilesVec) {
         // Set pointers back to file's beginning
         if (SetFilePointer(hTemp, 0, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
-            std::cout << GetLastError() << std::endl;
+            throw std::string("Failed to set pointer back to segment file' beginning");
         }
 
         if (!ReadFile(hTemp, static_cast<void*>(buff.data()), LineSizeBytes, &nRead, NULL)) {
-            std::cout << GetLastError() << std::endl;
+            throw std::string("Failed to read from segment file");
         }
-        std::cout << nRead << std::endl;
+
         std::string stringBuff = std::string(buff.begin(), buff.end());
-        std::cout << stringBuff << std::endl;
         whichFile[stringBuff] = hTemp;
         minHeap.push(stringBuff);
     }
-
-    
 
     // Write to big file
     DWORD nWrite = 0;
@@ -216,12 +200,10 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
     while (minHeap.empty() == false)
     {
         if (!WriteFile(hOutFile, minHeap.top().c_str(), LineSizeBytes, &nWrite, NULL)) {
-            std::cout << prefix << "Problem writing to big file: " << GetLastError() << std::endl;
-            return;
+            throw std::string("Problem Writing to big file");
         }
         
         std::string popped = minHeap.top();
-        std::cout << minHeap.top();
         minHeap.pop();
 
         // Insert new element to minHeap
@@ -230,22 +212,19 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
         hPoppedFile = whichFile[popped];
 
         if (hPoppedFile == INVALID_HANDLE_VALUE) {
-            std::cout << GetLastError << std::endl;
+            throw std::string("Unable to open segment file while sorting to big file");
         }
 
         if (!ReadFile(hPoppedFile, static_cast<void*>(buff.data()), LineSizeBytes, &nRead, NULL)) {
-            std::cout << GetLastError() << std::endl;
+            throw std::string("Unable to read segment file while sorting to big file");
             
         }
         if (nRead) {
-            
             std::string stringBuff = std::string(buff.begin(), buff.end());
-            std::cout << "Added the string: " << stringBuff;
             whichFile[stringBuff] = hPoppedFile;
             minHeap.push(stringBuff);
         }
         else {
-            std::cout << "File is empty." << std::endl;
             CloseHandle(hPoppedFile);
         }
         
@@ -258,19 +237,21 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
 
 int main(int argc, char **argv)
 {
-    // TODO: Add try and catch
-    // TODO: Delete when done
-    /*
-    if (argc != 3) {
-        std::cout << "Crucial parameteres missing. Syntax: ./app <inPath> <outPath>" << std::endl;
-        return 1;
-    }
-    */
-     
-    // int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes
+    // Deletes if exists
     DeleteFile(L"sorted.txt");
+    
+    // int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes
     FileSort fs(100, 2, 6);
-    fs.Sort("tests/test1.txt", "./sorted.txt");
+    
+    // Handle WINAPI Errors thrown
+    try {
+        fs.Sort("tests/test1.txt", "./sorted.txt");
+    }
+    catch (const std::string& e) {
+        std::cout << prefixError << e << " WINAPI Error: " << GetLastError() << std::endl;
+    }
+    
+    
 
     return 0;
 }
