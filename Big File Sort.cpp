@@ -32,17 +32,23 @@ public:
 };
 
 void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePath) {
+    std::wstring temp = std::wstring(outFilePath.begin(), outFilePath.end());
+    LPCWSTR lpcwOutFilePath = temp.c_str();
+    
+    // Deletes out file path if exists
+    DeleteFile(lpcwOutFilePath);
+    
     // Check if file exists
-    std::wstring temp = std::wstring(inFilePath.begin(), inFilePath.end());
-    LPCWSTR wsInFilePath = temp.c_str();
-    DWORD dwFileAttrib = GetFileAttributes(wsInFilePath);
+    temp = std::wstring(inFilePath.begin(), inFilePath.end());
+    LPCWSTR lpcwInFilePath = temp.c_str();
+    DWORD dwFileAttrib = GetFileAttributes(lpcwInFilePath);
 
     if (!(dwFileAttrib != INVALID_FILE_ATTRIBUTES && !(dwFileAttrib & FILE_ATTRIBUTE_DIRECTORY))) {
         throw std::string("File Doesn't Exist");
     }
 
     // Check if file size exceed maxFileSizeBytes
-    HANDLE hBigFile = CreateFile(wsInFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hBigFile = CreateFile(lpcwInFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hBigFile == INVALID_HANDLE_VALUE) {
         throw std::string("Unable to open file");
     }
@@ -64,21 +70,34 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
     // Delete big file
     CloseHandle(hBigFile);
-    //DeleteFile(wsInFilePath);
+    //DeleteFile(lpcwInFilePath);
     std::cout << prefixInfo << "Finished divide " << std::endl;
     
     // Create output big file
     temp = std::wstring(outFilePath.begin(), outFilePath.end());
     LPCWSTR wsOutFilePath = temp.c_str();
     HANDLE hOutBigFile = CreateFile(wsOutFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hOutBigFile == INVALID_HANDLE_VALUE) {
+        
+        hOutBigFile = CreateFile(wsOutFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hOutBigFile == INVALID_HANDLE_VALUE) {
+            throw std::string("Can't open output file handle");
+        }
+        
+    }
     
     // Call merging of temp files into big file
     merge(hTempFiles, hOutBigFile, LineSizeBytes);
+
+    std::cout << prefixInfo << "Finished sorting into big file" << std::endl;
 
     int countFile = 0;
     bool noMoreFiles = false;
     std::string segFilePath;
     
+    std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
+
     // Delete every seg file
     do {
         segFilePath = "./segments/" + std::to_string(countFile) + ".txt";
@@ -86,10 +105,14 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
     } while (DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str()));
 
+    std::cout << prefixInfo << "Deleting segments directory..." << std::endl;
+
     // Delete segment directory after being emptied
     if (!RemoveDirectory(L"./segments")) {
         throw std::string("Failed to remove directory");
     }
+
+    std::cout << prefixInfo << "Completed Successfully. " << "New sorted file created: " << outFilePath << std::endl;
 
 }
 
@@ -229,6 +252,8 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
         }
         
     }
+
+    CloseHandle(hOutFile);
     
     return;
 }
@@ -237,8 +262,6 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
 
 int main(int argc, char **argv)
 {
-    // Deletes if exists
-    DeleteFile(L"sorted.txt");
     
     // int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes
     FileSort fs(100, 2, 6);
@@ -247,12 +270,11 @@ int main(int argc, char **argv)
     try {
         fs.Sort("tests/test1.txt", "./sorted.txt");
     }
-    catch (const std::string& e) {
+    catch (const std::string &e) {
         std::cout << prefixError << e << " WINAPI Error: " << GetLastError() << std::endl;
     }
     
     
-
     return 0;
 }
 
