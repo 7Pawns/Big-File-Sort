@@ -23,6 +23,10 @@ public:
         NumberOfLinesPerSegment = numberOfLinesPerSegment;
         LineSizeBytes = lineSizeBytes;
     }
+    ~FileSort(){
+        // Make sure everything is deleted
+        cleanup();
+    }
     void Sort(const std::string &inFilePath, const std::string &outFilePath);
     void Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath);
     void cleanup();

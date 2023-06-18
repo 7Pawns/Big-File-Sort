@@ -228,6 +228,13 @@ void FileSort::merge(const std::vector<int> &dTempFiles, const int &dOutFile, co
 }
 
 void FileSort::cleanup(){
+    
+    // Check if directory exists to not call cleanup twice
+    DIR *exists = opendir("segments");
+    if (exists == NULL) return;
+
+    closedir(exists);
+
     std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
 
     // Delete every seg file

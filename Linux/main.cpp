@@ -12,7 +12,6 @@ int main(int argc, char **argv) {
     }
     catch (const std::string &e){
         std::cout << fs.prefixError << e << std::endl;
-        fs.cleanup();
         return 1;
     }
     
