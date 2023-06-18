@@ -10,7 +10,7 @@ private:
     int NumberOfLinesPerSegment; // Lines per partition
     int LineSizeBytes; // Line syntax: "Something\r\n"
     int startFileNum = 0;
-    
+
     std::vector<HANDLE> divide(const HANDLE&, const DWORD&, const int&, const int&, int&);
     void merge(const std::vector<HANDLE>&, const HANDLE&, const int&);
 public:
@@ -22,6 +22,10 @@ public:
         MaxFileSizeBytes = maxFileSizeBytes;
         NumberOfLinesPerSegment = numberOfLinesPerSegment;
         LineSizeBytes = lineSizeBytes;
+    }
+    ~FileSort() {
+        // Make sure everything always gets cleaned up
+        cleanup();
     }
     void Sort(const std::string& inFilePath, const std::string& outFilePath);
     void Sort(const std::vector<std::string>& inFilePaths, const std::string& outFilePath);

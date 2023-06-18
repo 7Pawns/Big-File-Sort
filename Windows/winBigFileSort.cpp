@@ -302,14 +302,18 @@ void FileSort::merge(const std::vector<HANDLE> &hTempFilesVec, const HANDLE &hOu
 
 // Deletes all segment files and segments directory
 void FileSort::cleanup() {
-    std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
+    DWORD segmentsFolderAttr = GetFileAttributesA("segments");
+    if (segmentsFolderAttr == INVALID_FILE_ATTRIBUTES) {
+        // Directory already cleaned up
+        return;
+    }
+    
+    std::cout << prefixInfo << "Deleting segment files..." << std::endl;
 
     // Delete every seg file
     for (int i = 0; i < startFileNum; ++i) {
         std::string segFilePath = "segments/" + std::to_string(i) + ".txt";
-        if (!DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str())) {
-            throw std::string("Failed to remove file");
-        }
+        DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str());
     }
 
     std::cout << prefixInfo << "Deleting segments directory..." << std::endl;
