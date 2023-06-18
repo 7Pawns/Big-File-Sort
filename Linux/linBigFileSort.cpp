@@ -152,7 +152,10 @@ std::vector<int> divide(const std::string inFilePath, const int fileSize, const 
         for (int j = 0; j < NumberOfLinesPerSegment; ++j){
             nRead = read(dBigFile, static_cast<void*>(buff.data()), LineSizeBytes);
 
-            words.push_back(std::string(buff.begin(), buff.end()));
+            if (nRead != 0){
+                words.push_back(std::string(buff.begin(), buff.end()));
+            }
+
         }
 
         
@@ -192,7 +195,7 @@ std::vector<int> divide(const std::string inFilePath, const int fileSize, const 
 // Merge the temp files into one sorted big file
 void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
     // Priority queue works like minheap underneath
-    std::map<std::string, int> whichFile;
+    std::multimap<std::string, int> whichFile;
     std::priority_queue<std::string, std::vector<std::string>, std::greater<std::string> > minHeap; 
     std::vector<char> buff(LineSizeBytes);
     size_t nRead;
@@ -210,7 +213,7 @@ void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
         }
 
         std::string stringBuff = std::string(buff.begin(), buff.end());
-        whichFile[stringBuff] = dTempFile;
+        whichFile.insert(std::pair<std::string, int>(stringBuff, dTempFile));
         minHeap.push(stringBuff);
     }
 
@@ -228,12 +231,15 @@ void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
         minHeap.pop();
 
         // Insert new element to minHeap from the file the popped word was from
-        dPoppedFile = whichFile[popped];
+        if (whichFile.find(popped) != whichFile.end()) {
+            dPoppedFile = whichFile.find(popped)->second;
+            whichFile.erase(whichFile.find(popped));
+        }
         
         nRead = read(dPoppedFile, static_cast<void*>(buff.data()), LineSizeBytes);
         if (nRead) {
             std::string stringBuff = std::string(buff.begin(), buff.end());
-            whichFile[stringBuff] = dPoppedFile;
+            whichFile.insert(std::pair<std::string, int>(stringBuff, dPoppedFile));
             minHeap.push(stringBuff);
         }
         else {
@@ -266,7 +272,7 @@ int main(int argc, char **argv) {
 
     try {
         fs.Sort("tests/test1.txt", "./sorted.txt");
-        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" , "tests/test3.txt"};
+        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" , "tests/test2.txt"};
         startFileNum = 0;
         fs.Sort(inFilePaths, "./sorted2.txt");  
     }
