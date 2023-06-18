@@ -76,7 +76,42 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
 // Take multiple files and sort them into one big file
 void FileSort::Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath){
+    std::vector<int> dAllTempFiles;
+
+    for (std::string inFilePath : inFilePaths){
+        // Validate each file
+        // Check if file exists
+        if (access(inFilePath.c_str(), F_OK) != 0) {
+            throw std::string("File doesn't exist");
+        } 
+        
+        // Get file size
+        struct stat st;
+        stat(inFilePath.c_str(), &st);
+        int size = st.st_size;
+
+        std::cout << prefixInfo << "FileSize: " << size << std::endl;
+
+        // Check if file size exceeds limit
+        if (size > MaxFileSizeBytes){
+            throw std::string("File size exceeds limit");
+        }
+
+        std::vector<int> dTempFiles = divide(inFilePath, size, LineSizeBytes, NumberOfLinesPerSegment, startFileNum);
+
+        dAllTempFiles.insert(dAllTempFiles.end(), dTempFiles.begin(), dTempFiles.end());
+    }
+
+    // Create new big file
+    int dOutBigFile = open(outFilePath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0755);
+
+    if (dOutBigFile < 0){
+        throw std::string("Couldn't open output file");
+    }
     
+    merge(dAllTempFiles, dOutBigFile, LineSizeBytes);
+
+    cleanup();
 }
 
 // Divide the big file into sorted segment files
@@ -116,36 +151,32 @@ std::vector<int> divide(const std::string inFilePath, const int fileSize, const 
 
         for (int j = 0; j < NumberOfLinesPerSegment; ++j){
             nRead = read(dBigFile, static_cast<void*>(buff.data()), LineSizeBytes);
+
             words.push_back(std::string(buff.begin(), buff.end()));
         }
 
-        std::cout << prefixInfo << "Buffer number " << i << ": " << std::endl;
-        std::cout << prefixInfo << "Read " << nRead << " bytes" << std::endl;
-
-        std::cout <<  prefixInfo << "Words before sort: " << std::endl;
-
-        for (std::string word: words){
-            std::cout << word;
-        }
-
+        
         // Sort the buffer words
         std::sort(words.begin(), words.end());
-
-        std::cout <<  prefixInfo << "\nWords after sort: " << std::endl;
-        for (std::string word: words){
-            std::cout << word;
-        }
 
         // Create segment file (i.txt)
         std::string segFilePath = "segments/" + std::to_string(i + startFileNum) + ".txt";
         std::cout << "Writing to: " << segFilePath << std::endl;
         int dSegFile = open(segFilePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0755);
 
+        if (dSegFile < 0){
+            throw std::string("Failed to open segment file");
+        }
+
         // Write the sorted buffer to dSegFile
         size_t nWrite;
         for (std::string word : words){
             nWrite = write(dSegFile, word.c_str(), LineSizeBytes);
-            std::cout << "Written " << nWrite << " bytes to " << segFilePath << std::endl;
+
+            if (!nWrite){
+                throw std::string("Failed to write to segment file");
+            }
+
         }
 
         dTempFiles.push_back(dSegFile);
@@ -173,6 +204,11 @@ void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
 
         // Reading first line from segment file
         nRead = read(dTempFile, static_cast<void*>(buff.data()), LineSizeBytes);
+        
+        if (!nRead){
+            throw std::string("Failed to read from segment file");
+        }
+
         std::string stringBuff = std::string(buff.begin(), buff.end());
         whichFile[stringBuff] = dTempFile;
         minHeap.push(stringBuff);
@@ -183,6 +219,10 @@ void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
     size_t nWrite;
     while (minHeap.empty() == false){
         nWrite = write(dOutFile, minHeap.top().c_str(), LineSizeBytes);
+
+        if (!nWrite){
+            throw std::string("Failed to write to outBigFile");
+        }
 
         std::string popped = minHeap.top();
         minHeap.pop();
@@ -224,7 +264,17 @@ int main(int argc, char **argv) {
     // int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes
     FileSort fs(100, 2, 6);
 
-    fs.Sort("tests/test1.txt", "./sorted.txt");
+    try {
+        fs.Sort("tests/test1.txt", "./sorted.txt");
+        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" , "tests/test3.txt"};
+        startFileNum = 0;
+        fs.Sort(inFilePaths, "./sorted2.txt");  
+    }
+    catch (const std::string &e){
+        std::cout << prefixError << e << std::endl;
+        return 1;
+    }
+    
     
     return 0;
 }

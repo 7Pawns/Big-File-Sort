@@ -272,7 +272,7 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
 void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes) {
     
     // Priority queue works like minheap underneath
-    std::map<std::string, HANDLE> whichFile;
+    std::multimap<std::string, HANDLE> whichFile;
     std::priority_queue<std::string, std::vector<std::string>, std::greater<std::string> > minHeap; 
     std::vector<char> buff(LineSizeBytes);
     DWORD nRead = 0;
@@ -289,13 +289,15 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
         }
 
         std::string stringBuff = std::string(buff.begin(), buff.end());
-        whichFile[stringBuff] = hTemp;
+        
+        whichFile.insert(std::pair<std::string, HANDLE>(stringBuff, hTemp));
+        //whichFile[stringBuff] = hTemp;
         minHeap.push(stringBuff);
     }
 
     // Write to big file
     DWORD nWrite = 0;
-    HANDLE hPoppedFile;
+    HANDLE hPoppedFile = HANDLE();
     while (minHeap.empty() == false)
     {
         if (!WriteFile(hOutFile, minHeap.top().c_str(), LineSizeBytes, &nWrite, NULL)) {
@@ -308,19 +310,25 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
         // Insert new element to minHeap
         // If file ended buff[0] would be nothing so nothing will get pushed to the minheap
         
-        hPoppedFile = whichFile[popped];
 
+        if (whichFile.find(popped) != whichFile.end()) {
+            hPoppedFile = whichFile.find(popped)->second;
+            whichFile.erase(whichFile.find(popped));
+        }
+
+        
         if (hPoppedFile == INVALID_HANDLE_VALUE) {
             throw std::string("Unable to open segment file while sorting to big file");
         }
 
         if (!ReadFile(hPoppedFile, static_cast<void*>(buff.data()), LineSizeBytes, &nRead, NULL)) {
-            throw std::string("Unable to read segment file while sorting to big file");
+            throw std::string("Unable to read segment file while sorting to big file: " + popped);
             
         }
         if (nRead) {
             std::string stringBuff = std::string(buff.begin(), buff.end());
-            whichFile[stringBuff] = hPoppedFile;
+            whichFile.insert(std::pair<std::string, HANDLE>(stringBuff, hPoppedFile));
+            //whichFile[stringBuff] = hPoppedFile;
             minHeap.push(stringBuff);
         }
         else {
@@ -363,8 +371,7 @@ int main(int argc, char **argv)
     
     // Handle WINAPI Errors thrown
     try {
-        fs.Sort("tests/test1.txt", "./sorted.txt");
-        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" };
+        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt", "tests/test2.txt", "tests/test1.txt"};
         startFileNum = 0;
         fs.Sort(inFilePaths, "./sorted2.txt");
     }
