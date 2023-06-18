@@ -13,10 +13,6 @@ const std::string prefixError = "[-] ";
 
 int startFileNum = 0;
 
-std::vector<HANDLE> divide(HANDLE, DWORD, int, int, int&);
-void merge(std::vector<HANDLE>, HANDLE, int);
-void cleanup();
-
 class FileSort {
 private:
     // Notice that for the minHeap approach if NumberOfTempFiles * LineSizeBytes > availabe memory the process will cause an overflow
@@ -24,6 +20,8 @@ private:
     int MaxFileSizeBytes; // Maximum size of the big file
     int NumberOfLinesPerSegment; // Lines per partition
     int LineSizeBytes; // Line syntax: "Something\r\n"
+    std::vector<HANDLE> divide(HANDLE, DWORD, int, int, int&);
+    void merge(std::vector<HANDLE>, HANDLE, int);
 public:
     FileSort(int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes) {
         MaxFileSizeBytes = maxFileSizeBytes;
@@ -32,9 +30,14 @@ public:
     }
     void Sort(const std::string &inFilePath, const std::string &outFilePath);
     void Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath);
+    void cleanup();
+    
 };
 
 void FileSort::Sort(const std::vector<std::string>& inFilePaths, const std::string &outFilePath) {
+    // Initial value
+    startFileNum = 0;
+    
     // Delete out file path if exists
     std::wstring temp = std::wstring(outFilePath.begin(), outFilePath.end());
     LPCWSTR lpcwOutFilePath = temp.c_str();
@@ -108,6 +111,8 @@ void FileSort::Sort(const std::vector<std::string>& inFilePaths, const std::stri
 }
 
 void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePath) {
+    // Initial value
+    
     std::wstring temp = std::wstring(outFilePath.begin(), outFilePath.end());
     LPCWSTR lpcwOutFilePath = temp.c_str();
     
@@ -176,10 +181,10 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 }
 
 // Divide Big files into temp files
-std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, int NumberOfLinesPerSegment, int &startFileNum) {
+std::vector<HANDLE> FileSort::divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, int NumberOfLinesPerSegment, int &startFileNum) {
 
     // Create Diretory for segment files
-    if (!CreateDirectory(L"./segments", NULL)) {
+    if (!CreateDirectory(L"segments", NULL)) {
         // Check if directory already has files and startFileNum = 0
         
     }
@@ -228,7 +233,7 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
         std::sort(words.begin(), words.end());
 
         // Create seg file (i.txt)
-        std::string segFilePath = "./segments/" + std::to_string(i + startFileNum) + ".txt";
+        std::string segFilePath = "segments/" + std::to_string(i + startFileNum) + ".txt";
         std::cout << prefixInfo << "Writing to: " << segFilePath << std::endl;
         HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
@@ -254,7 +259,7 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
 }
 
 // Merge vector of temp files into a big file
-void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes) {
+void FileSort::merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes) {
     
     // Priority queue works like minheap underneath
     std::multimap<std::string, HANDLE> whichFile;
@@ -328,12 +333,12 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
 }
 
 // Deletes all segment files and segments directory
-void cleanup() {
+void FileSort::cleanup() {
     std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
 
     // Delete every seg file
     for (int i = 0; i < startFileNum; ++i) {
-        std::string segFilePath = "./segments/" + std::to_string(i) + ".txt";
+        std::string segFilePath = "segments/" + std::to_string(i) + ".txt";
         if (!DeleteFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str())) {
             throw std::string("Failed to remove file");
         }
@@ -342,8 +347,8 @@ void cleanup() {
     std::cout << prefixInfo << "Deleting segments directory..." << std::endl;
 
     // Delete segment directory after being emptied
-    if (!RemoveDirectory(L"./segments")) {
-        throw std::string("Failed to remove directory");
+    if (!RemoveDirectory(L"segments")) {
+        std::cout << prefixError << "Could not delete segments directory" << std::endl;
     }
 
 }
@@ -357,14 +362,14 @@ int main(int argc, char **argv)
     // Handle WINAPI Errors thrown
     try {
         std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt", "tests/test2.txt"};
-        startFileNum = 0;
-        fs.Sort(inFilePaths, "./sorted2.txt");
+        fs.Sort(inFilePaths, "sorted.txt");
     }
     catch (const std::string &e) {
         std::cout << prefixError << e << " WINAPI Error: " << GetLastError() << std::endl;
+        fs.cleanup();
+        return 1;
     }
     
-
     return 0;
 }
 

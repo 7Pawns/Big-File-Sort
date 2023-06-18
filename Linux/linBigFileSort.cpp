@@ -19,10 +19,6 @@ const std::string prefixError = "[-] ";
 // Used later to manage segment file names
 int startFileNum = 0;
 
-std::vector<int> divide(const std::string, const int, const int, const int, int&);
-void merge(std::vector<int>, int, int);
-void cleanup();
-
 class FileSort {
 private:
     // Notice that for the minHeap approach if NumberOfTempFiles * LineSizeBytes > availabe memory the process will cause an overflow
@@ -30,6 +26,8 @@ private:
     int MaxFileSizeBytes; // Maximum size of the big file
     int NumberOfLinesPerSegment; // Lines per partition
     int LineSizeBytes; // Line syntax: "Something\r\n"
+    std::vector<int> divide(const std::string, const int, const int, const int, int&);
+    void merge(std::vector<int>, int, int);
 public:
     FileSort(int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes) {
         MaxFileSizeBytes = maxFileSizeBytes;
@@ -38,10 +36,14 @@ public:
     }
     void Sort(const std::string &inFilePath, const std::string &outFilePath);
     void Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath);
+    void cleanup();
 };
 
 // Implementation for one file
 void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePath){
+    // Initial value
+    startFileNum = 0;
+
     // Check if file exists
     if (access(inFilePath.c_str(), F_OK) != 0) {
         throw std::string("File doesn't exist");
@@ -76,6 +78,9 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 
 // Take multiple files and sort them into one big file
 void FileSort::Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath){
+    // Initial value
+    startFileNum = 0;
+    
     std::vector<int> dAllTempFiles;
 
     for (std::string inFilePath : inFilePaths){
@@ -115,7 +120,7 @@ void FileSort::Sort(const std::vector<std::string> &inFilePaths, const std::stri
 }
 
 // Divide the big file into sorted segment files
-std::vector<int> divide(const std::string inFilePath, const int fileSize, const int LineSizeBytes, const int NumberOfLinesPerSegment, int &startFileNum){
+std::vector<int> FileSort::divide(const std::string inFilePath, const int fileSize, const int LineSizeBytes, const int NumberOfLinesPerSegment, int &startFileNum){
     std::vector<char> buff(LineSizeBytes);
     int dBigFile = open(inFilePath.c_str(), O_RDONLY);
 
@@ -131,7 +136,6 @@ std::vector<int> divide(const std::string inFilePath, const int fileSize, const 
     long pages = sysconf(_SC_PHYS_PAGES);
     long page_size = sysconf(_SC_PAGE_SIZE);
     long availableSpace = pages * page_size;
-    std::cout << prefixInfo << "Available RAM: " << availableSpace << std::endl;
 
     // Check if enough for execution
     if (availableSpace < segFileCount * LineSizeBytes){
@@ -164,7 +168,7 @@ std::vector<int> divide(const std::string inFilePath, const int fileSize, const 
 
         // Create segment file (i.txt)
         std::string segFilePath = "segments/" + std::to_string(i + startFileNum) + ".txt";
-        std::cout << "Writing to: " << segFilePath << std::endl;
+        std::cout << prefixInfo << "Writing to: " << segFilePath << std::endl;
         int dSegFile = open(segFilePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0755);
 
         if (dSegFile < 0){
@@ -193,7 +197,7 @@ std::vector<int> divide(const std::string inFilePath, const int fileSize, const 
 }
 
 // Merge the temp files into one sorted big file
-void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
+void FileSort::merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
     // Priority queue works like minheap underneath
     std::multimap<std::string, int> whichFile;
     std::priority_queue<std::string, std::vector<std::string>, std::greater<std::string> > minHeap; 
@@ -251,7 +255,7 @@ void merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
 
 }
 
-void cleanup(){
+void FileSort::cleanup(){
     std::cout << prefixInfo << "Deleting all segment files..." << std::endl;
 
     // Delete every seg file
@@ -271,16 +275,16 @@ int main(int argc, char **argv) {
     FileSort fs(100, 2, 6);
 
     try {
-        fs.Sort("tests/test1.txt", "./sorted.txt");
+        
         std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" , "tests/test2.txt"};
-        startFileNum = 0;
         fs.Sort(inFilePaths, "./sorted2.txt");  
+   
     }
     catch (const std::string &e){
         std::cout << prefixError << e << std::endl;
+        fs.cleanup();
         return 1;
     }
-    
     
     return 0;
 }
