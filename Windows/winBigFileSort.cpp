@@ -115,7 +115,6 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
     // Call division of temp files function
     std::vector<HANDLE> hTempFiles = divide(hBigFile, fileSize, LineSizeBytes, NumberOfLinesPerSegment, startFileNum);
 
-    // TODO: Check if necessary
     if (hTempFiles.empty()) {
         std::cout << "Process Failed" << std::endl;
         return;
@@ -155,11 +154,9 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 // Divide Big files into temp files
 std::vector<HANDLE> FileSort::divide(const HANDLE &hBigFile, const DWORD &fileSize, const int &LineSizeBytes, const int &NumberOfLinesPerSegment, int &startFileNum) {
 
-    // Create Diretory for segment files
-    if (!CreateDirectory(L"segments", NULL)) {
-        // Check if directory already has files and startFileNum = 0
-        
-    }
+    // Will only be created if not already exists
+    CreateDirectory(L"segments", NULL);
+    
 
     // Opening Big File for read and write into segment files
     DWORD nRead = 0;
