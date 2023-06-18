@@ -21,6 +21,3 @@ When we sort big files we cannot load the entire text into the RAM, therefore we
 ## Sorting Multiple Big Files
 For this, all we have to do is break each file into segment files first, and only then start the the rebuilding.
 
-
-## TODO:
-* Add linux API support.
