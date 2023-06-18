@@ -1,43 +1,15 @@
-#include <iostream>
+#include "FileSort.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <dirent.h>
-#include <vector>
 #include <string>
 #include <cmath>
 #include <algorithm>
 #include <map>
 #include <queue>
-
-// Nicer looking messages
-const std::string prefixInfo = "[+] ";
-const std::string prefixError = "[-] ";
-
-// Used later to manage segment file names
-int startFileNum = 0;
-
-class FileSort {
-private:
-    // Notice that for the minHeap approach if NumberOfTempFiles * LineSizeBytes > availabe memory the process will cause an overflow
-    // Because of that we need to make longer files, not more files
-    int MaxFileSizeBytes; // Maximum size of the big file
-    int NumberOfLinesPerSegment; // Lines per partition
-    int LineSizeBytes; // Line syntax: "Something\r\n"
-    std::vector<int> divide(const std::string, const int, const int, const int, int&);
-    void merge(std::vector<int>, int, int);
-public:
-    FileSort(int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes) {
-        MaxFileSizeBytes = maxFileSizeBytes;
-        NumberOfLinesPerSegment = numberOfLinesPerSegment;
-        LineSizeBytes = lineSizeBytes;
-    }
-    void Sort(const std::string &inFilePath, const std::string &outFilePath);
-    void Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath);
-    void cleanup();
-};
 
 // Implementation for one file
 void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePath){
@@ -270,21 +242,3 @@ void FileSort::cleanup(){
     remove("segments");
 }
 
-int main(int argc, char **argv) {
-    // int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes
-    FileSort fs(100, 2, 6);
-
-    try {
-        
-        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt" , "tests/test2.txt"};
-        fs.Sort(inFilePaths, "./sorted2.txt");  
-   
-    }
-    catch (const std::string &e){
-        std::cout << prefixError << e << std::endl;
-        fs.cleanup();
-        return 1;
-    }
-    
-    return 0;
-}
