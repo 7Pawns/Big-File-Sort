@@ -221,8 +221,10 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
             if (!ReadFile(hBigFile, static_cast<void*>(buff.data()), LineSizeBytes, &nRead, NULL)) {
                 throw std::string("Failed to read big file");
             }
-
-            words.push_back(std::string(buff.begin(), buff.end()));
+            if (nRead != 0) {
+                words.push_back(std::string(buff.begin(), buff.end()));
+            }
+            
         }
         std::cout << sizeof(words) << std::endl;
 
@@ -289,9 +291,9 @@ void merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes
         }
 
         std::string stringBuff = std::string(buff.begin(), buff.end());
+
         
         whichFile.insert(std::pair<std::string, HANDLE>(stringBuff, hTemp));
-        //whichFile[stringBuff] = hTemp;
         minHeap.push(stringBuff);
     }
 
@@ -371,7 +373,7 @@ int main(int argc, char **argv)
     
     // Handle WINAPI Errors thrown
     try {
-        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt", "tests/test2.txt", "tests/test1.txt"};
+        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt", "tests/test2.txt"};
         startFileNum = 0;
         fs.Sort(inFilePaths, "./sorted2.txt");
     }
