@@ -1,38 +1,10 @@
-#include <Windows.h>
-#include <iostream>
+#include "FileSort.h" // includes <Windows.h> and <vector>
 #include <exception>
-#include <vector>
 #include <string>
 #include <algorithm>
 #include <queue>
 #include <map>
 
-// Nicer looking messages
-const std::string prefixInfo = "[+] ";
-const std::string prefixError = "[-] ";
-
-int startFileNum = 0;
-
-class FileSort {
-private:
-    // Notice that for the minHeap approach if NumberOfTempFiles * LineSizeBytes > availabe memory the process will cause an overflow
-    // Because of that we need to make longer files, not more files
-    int MaxFileSizeBytes; // Maximum size of the big file
-    int NumberOfLinesPerSegment; // Lines per partition
-    int LineSizeBytes; // Line syntax: "Something\r\n"
-    std::vector<HANDLE> divide(HANDLE, DWORD, int, int, int&);
-    void merge(std::vector<HANDLE>, HANDLE, int);
-public:
-    FileSort(int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes) {
-        MaxFileSizeBytes = maxFileSizeBytes;
-        NumberOfLinesPerSegment = numberOfLinesPerSegment;
-        LineSizeBytes = lineSizeBytes;
-    }
-    void Sort(const std::string &inFilePath, const std::string &outFilePath);
-    void Sort(const std::vector<std::string> &inFilePaths, const std::string& outFilePath);
-    void cleanup();
-    
-};
 
 void FileSort::Sort(const std::vector<std::string>& inFilePaths, const std::string &outFilePath) {
     // Initial value
@@ -353,24 +325,5 @@ void FileSort::cleanup() {
 
 }
 
-int main(int argc, char **argv)
-{
-    
-    // int maxFileSizeBytes, int numberOfLinesPerSegment, int lineSizeBytes
-    FileSort fs(100, 2, 6);
-    
-    // Handle WINAPI Errors thrown
-    try {
-        std::vector<std::string> inFilePaths = { "tests/test1.txt", "tests/test2.txt", "tests/test2.txt"};
-        fs.Sort(inFilePaths, "sorted.txt");
-    }
-    catch (const std::string &e) {
-        std::cout << prefixError << e << " WINAPI Error: " << GetLastError() << std::endl;
-        fs.cleanup();
-        return 1;
-    }
-    
-    return 0;
-}
 
 
