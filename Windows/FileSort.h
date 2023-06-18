@@ -11,8 +11,8 @@ private:
     int LineSizeBytes; // Line syntax: "Something\r\n"
     int startFileNum = 0;
     
-    std::vector<HANDLE> divide(HANDLE, DWORD, int, int, int&);
-    void merge(std::vector<HANDLE>, HANDLE, int);
+    std::vector<HANDLE> divide(const HANDLE&, const DWORD&, const int&, const int&, int&);
+    void merge(const std::vector<HANDLE>&, const HANDLE&, const int&);
 public:
     // Nicer looking messages
     const std::string prefixInfo = "[+] ";

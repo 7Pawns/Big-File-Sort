@@ -92,7 +92,7 @@ void FileSort::Sort(const std::vector<std::string> &inFilePaths, const std::stri
 }
 
 // Divide the big file into sorted segment files
-std::vector<int> FileSort::divide(const std::string inFilePath, const int fileSize, const int LineSizeBytes, const int NumberOfLinesPerSegment, int &startFileNum){
+std::vector<int> FileSort::divide(const std::string &inFilePath, const int &fileSize, const int &LineSizeBytes, const int &NumberOfLinesPerSegment, int &startFileNum){
     std::vector<char> buff(LineSizeBytes);
     int dBigFile = open(inFilePath.c_str(), O_RDONLY);
 
@@ -169,7 +169,7 @@ std::vector<int> FileSort::divide(const std::string inFilePath, const int fileSi
 }
 
 // Merge the temp files into one sorted big file
-void FileSort::merge(std::vector<int> dTempFiles, int dOutFile, int LineSizeBytes){
+void FileSort::merge(const std::vector<int> &dTempFiles, const int &dOutFile, const int &LineSizeBytes){
     // Priority queue works like minheap underneath
     std::multimap<std::string, int> whichFile;
     std::priority_queue<std::string, std::vector<std::string>, std::greater<std::string> > minHeap; 

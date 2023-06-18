@@ -153,7 +153,7 @@ void FileSort::Sort(const std::string &inFilePath, const std::string &outFilePat
 }
 
 // Divide Big files into temp files
-std::vector<HANDLE> FileSort::divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, int NumberOfLinesPerSegment, int &startFileNum) {
+std::vector<HANDLE> FileSort::divide(const HANDLE &hBigFile, const DWORD &fileSize, const int &LineSizeBytes, const int &NumberOfLinesPerSegment, int &startFileNum) {
 
     // Create Diretory for segment files
     if (!CreateDirectory(L"segments", NULL)) {
@@ -231,7 +231,7 @@ std::vector<HANDLE> FileSort::divide(HANDLE hBigFile, DWORD fileSize, int LineSi
 }
 
 // Merge vector of temp files into a big file
-void FileSort::merge(std::vector<HANDLE> hTempFilesVec, HANDLE hOutFile, int LineSizeBytes) {
+void FileSort::merge(const std::vector<HANDLE> &hTempFilesVec, const HANDLE &hOutFile, const int &LineSizeBytes) {
     
     // Priority queue works like minheap underneath
     std::multimap<std::string, HANDLE> whichFile;

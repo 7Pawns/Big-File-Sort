@@ -11,8 +11,8 @@ private:
     int LineSizeBytes; // Line syntax: "Something\r\n"
     int startFileNum = 0; // used later for segment files
 
-    std::vector<int> divide(const std::string, const int, const int, const int, int&);
-    void merge(std::vector<int>, int, int);
+    std::vector<int> divide(const std::string&, const int&, const int&, const int&, int&);
+    void merge(const std::vector<int>&, const int&, const int&);
 public:
     // Nicer looking messages
     const std::string prefixInfo = "[+] ";
