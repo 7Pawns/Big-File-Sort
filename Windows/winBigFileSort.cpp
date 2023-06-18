@@ -156,7 +156,6 @@ std::vector<HANDLE> FileSort::divide(const HANDLE &hBigFile, const DWORD &fileSi
 
     // Will only be created if not already exists
     CreateDirectory(L"segments", NULL);
-    
 
     // Opening Big File for read and write into segment files
     DWORD nRead = 0;
