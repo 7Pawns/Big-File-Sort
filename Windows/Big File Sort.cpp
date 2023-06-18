@@ -66,13 +66,10 @@ void FileSort::Sort(const std::vector<std::string>& inFilePaths, const std::stri
         std::cout << prefixInfo << "File size is: " << fileSize << std::endl;
 
         // Call division of temp files function
-        std::cout << "Start File num: " << startFileNum << std::endl;
         std::vector<HANDLE> hTempFiles = divide(hBigFile, fileSize, LineSizeBytes, NumberOfLinesPerSegment, startFileNum);
 
-        // TODO: Check if necessary
         if (hTempFiles.empty()) {
-            std::cout << "Process Failed" << std::endl;
-            return;
+            throw std::string("hTempFiles is empty");
         }
 
         // Delete big file
@@ -226,25 +223,13 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
             }
             
         }
-        std::cout << sizeof(words) << std::endl;
 
-        std::cout << prefixInfo << "Buffer number " << i << ": " << std::endl;
-        std::cout << prefixInfo << "Read " << nRead << " bytes" << std::endl;
-
-        std::cout << prefixInfo << "Words before sort: " << std::endl;
-        for (std::string word : words) {
-            std::cout << word;
-        }
         //Sort the buffer words
         std::sort(words.begin(), words.end());
 
-        std::cout << prefixInfo << "Words after sort: " << std::endl;
-        for (std::string word : words) {
-            std::cout << word;
-        }
         // Create seg file (i.txt)
         std::string segFilePath = "./segments/" + std::to_string(i + startFileNum) + ".txt";
-        std::cout << "Writing to: " << segFilePath << std::endl;
+        std::cout << prefixInfo << "Writing to: " << segFilePath << std::endl;
         HANDLE hSegFile = CreateFile((std::wstring(segFilePath.begin(), segFilePath.end())).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (!hSegFile) {
@@ -258,8 +243,6 @@ std::vector<HANDLE> divide(HANDLE hBigFile, DWORD fileSize, int LineSizeBytes, i
                 throw std::string("Failed writing to segment file");
             }
         }
-
-        std::cout << prefixInfo << "Written " << nWrite << " bytes to " << segFilePath << std::endl;
 
         hTempFiles.push_back(hSegFile);
 
