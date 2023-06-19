@@ -1,5 +1,5 @@
 # Big File Sort
-Big file sort using OS-level APIs.
+Big file sort using WINAPI and POSIX.
 
 ## Problem
 Why not just use merge sort?   
